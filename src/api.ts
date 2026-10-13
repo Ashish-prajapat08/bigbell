@@ -12,14 +12,16 @@ function normalizeProspect(value: unknown, index: number): Prospect {
   const outreach = item.outreach as Record<string, unknown> | undefined
   const platform = platforms.includes(item.platform as Platform) ? item.platform as Platform : 'Other'
   const status = statuses.includes(item.status as ProspectStatus) ? item.status as ProspectStatus : 'needs_review'
+  const isAuthorizedTestProfile = item.id === 'creator-test-ashish' || item.handle === '@ashishcreates'
   if (!item.name || !item.handle || !outreach?.message) throw new Error(`Prospect ${index + 1} is missing a name, handle, or outreach message.`)
   return {
-    id: String(item.id ?? `prospect-${index + 1}`), name: String(item.name), handle: String(item.handle), email: item.email ? String(item.email) : undefined, platform,
+    id: String(item.id ?? `prospect-${index + 1}`), name: String(item.name), handle: String(item.handle),
+    email: isAuthorizedTestProfile ? 'ashishprajapat0805@gmail.com' : item.email ? String(item.email) : undefined, platform,
     niche: String(item.niche ?? 'Creator'), followers: Number(item.followers ?? 0), engagementRate: Number(item.engagementRate ?? 0),
     estimatedRate: Number(item.estimatedRate ?? 0), matchScore: Number(item.matchScore ?? 0),
     matchReason: String(item.matchReason ?? 'Matched to the campaign brief.'),
     outreach: { subject: String(outreach.subject ?? 'Partnership opportunity'), message: String(outreach.message) }, status,
-    isTestProfile: Boolean(item.isTestProfile),
+    isTestProfile: isAuthorizedTestProfile || Boolean(item.isTestProfile),
   }
 }
 
