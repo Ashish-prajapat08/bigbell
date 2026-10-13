@@ -37,7 +37,8 @@ function App() {
   const [replyResult, setReplyResult] = useState<ReplyResult | null>(null)
   const [replyLoading, setReplyLoading] = useState(false)
   const [replyError, setReplyError] = useState('')
-  const [onboarding, setOnboarding] = useState<OnboardingProspect>({ name: 'Ashish Prajapat', email: 'ashishprajapat0805@gmail.com', platform: 'Instagram', handle: '@ashishcreates', country: 'India', agreedRate: '', contentFormat: 'Instagram Reel', deadline: '' })
+  const [onboarding, setOnboarding] = useState<OnboardingProspect>({ name: '', email: '', platform: '', handle: '', country: '', agreedRate: '', contentFormat: '', deadline: '' })
+  const [onboardingSource, setOnboardingSource] = useState('')
   const [onboardingResult, setOnboardingResult] = useState<OnboardingResult | null>(null)
   const [onboardingLoading, setOnboardingLoading] = useState(false)
   const [onboardingError, setOnboardingError] = useState('')
@@ -56,6 +57,28 @@ function App() {
 
   const valid = !Object.values(fieldErrors).some(Boolean)
   function update<K extends keyof CampaignBrief>(key: K, value: CampaignBrief[K]) { setCampaign((current) => ({ ...current, [key]: value })) }
+
+  function prefillOnboarding(prospect: Prospect, email = prospect.email || '') {
+    const country = /india/i.test(campaign.targetAudience) ? 'India' : ''
+    const contentFormat = prospect.platform === 'Instagram' ? 'Instagram Reel' : prospect.platform === 'YouTube' ? 'YouTube Integration' : prospect.platform === 'TikTok' ? 'TikTok Video' : ''
+    setOnboarding((current) => ({
+      ...current,
+      name: prospect.name,
+      email,
+      platform: prospect.platform,
+      handle: prospect.handle,
+      country,
+      contentFormat,
+    }))
+    setOnboardingSource(prospect.name)
+    setOnboardingResult(null)
+    setOnboardingError('')
+  }
+
+  function applyReplyResult(result: ReplyResult, prospect: Prospect | undefined, email?: string) {
+    setReplyResult(result)
+    if (result.classification === 'Interested' && prospect) prefillOnboarding(prospect, email)
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -103,8 +126,11 @@ function App() {
         await new Promise((resolve) => window.setTimeout(resolve, 750))
         const lower = replyText.toLowerCase()
         const classification = lower.includes('budget') || lower.includes('rate') || lower.includes('price') ? 'Pricing Query' : lower.includes('not interested') || lower.includes('pass') ? 'Rejected' : lower.includes('details') || lower.includes('more information') ? 'More Information' : 'Interested'
-        setReplyResult({ success: true, classification, confidence: 92, reasoning: classification === 'Pricing Query' ? 'The creator is open to the opportunity and explicitly asks about compensation.' : 'The language indicates the creator’s likely intent.', suggestedAction: classification === 'Pricing Query' ? 'Review the approved budget and prepare a clear rate-and-deliverables response for human approval.' : 'Prepare the appropriate next response and review it before sending.' })
-      } else setReplyResult(await classifyReply(replyText, { name: selected?.name || 'Sample Creator', handle: selected?.handle || '@samplecreator' }))
+        applyReplyResult({ success: true, classification, confidence: 92, reasoning: classification === 'Pricing Query' ? 'The creator is open to the opportunity and explicitly asks about compensation.' : 'The language indicates the creator’s likely intent.', suggestedAction: classification === 'Pricing Query' ? 'Review the approved budget and prepare a clear rate-and-deliverables response for human approval.' : 'Prepare the appropriate next response and review it before sending.' }, selected)
+      } else {
+        const result = await classifyReply(replyText, { name: selected?.name || 'Sample Creator', handle: selected?.handle || '@samplecreator' })
+        applyReplyResult(result, selected)
+      }
     } catch (caught) { setReplyError(caught instanceof Error ? caught.message : 'Reply classification failed.') }
     finally { setReplyLoading(false) }
   }
@@ -115,8 +141,12 @@ function App() {
       const data = await getLatestReplies()
       const latest = data.replies[0]
       if (!latest) throw new Error('No classified Gmail reply found yet. Send a reply from the test creator account and try again in about a minute.')
+      const replyProspect = prospects.find((prospect) => prospect.email?.toLowerCase() === latest.sender_email.toLowerCase())
+        ?? prospects.find((prospect) => prospect.name.toLowerCase() === latest.creator_name.toLowerCase())
+        ?? selected
+      if (replyProspect) setSelectedId(replyProspect.id)
       setReplyText(latest.reply_text)
-      setReplyResult({ success: true, classification: latest.classification, confidence: latest.confidence, reasoning: latest.reasoning, suggestedAction: latest.suggested_action })
+      applyReplyResult({ success: true, classification: latest.classification, confidence: latest.confidence, reasoning: latest.reasoning, suggestedAction: latest.suggested_action }, replyProspect, latest.sender_email)
     } catch (caught) { setReplyError(caught instanceof Error ? caught.message : 'Could not load Gmail replies.') }
     finally { setReplyLoading(false) }
   }
@@ -240,7 +270,7 @@ function App() {
           </section>
 
           <section id="onboarding-agent" className="agent-section onboarding-section">
-            <div className="section-title"><div><span className="step">04</span><div><h2>Onboarding Agent</h2><p>Collect the essentials and see exactly what is still missing.</p></div></div><span className="demo-label">SAMPLE PROSPECT</span></div>
+            <div className="section-title"><div><span className="step">04</span><div><h2>Onboarding Agent</h2><p>{onboardingSource ? `${onboardingSource}'s known details were auto-filled after an Interested reply.` : 'An Interested reply will automatically load the creator’s known details here.'}</p></div></div><span className="demo-label">{onboardingSource ? 'AUTO-FILLED' : 'WAITING FOR INTEREST'}</span></div>
             <div className="agent-grid onboarding-grid">
               <article className="panel agent-form">
                 <div className="onboarding-fields">
